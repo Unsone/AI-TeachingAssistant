@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>学生端 - 作业提交系统</title>
+  <style>
+    body { max-width: 800px; margin: 20px auto; padding: 0 20px; }
+    .section { margin: 30px 0; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+    button { padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    input[type="file"] { margin: 10px 0; }
+    textarea { width: 100%; height: 100px; margin: 10px 0; padding: 8px; box-sizing: border-box; }
+    img { max-width: 300px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>学生端 - 作业提交</h1>
+
+  <!-- 1. 提交作业区域 -->
+  <div class="section">
+    <h2>提交作业图片</h2>
+    <input type="file" id="image" accept="image/*">
+    <button onclick="uploadHomework()">提交作业</button>
+    <p id="uploadTip"></p>
+  </div>
+
+  <!-- 2. 查看我的作业区域 -->
+  <div class="section">
+    <h2>我的作业及评分</h2>
+    <button onclick="loadMyHomework()">刷新作业列表</button>
+    <div id="homeworkList"></div>
+  </div>
+
+  <!-- 3. 提交反馈区域 -->
+  <div class="section">
+    <h2>提交反馈</h2>
+    <input type="number" id="feedbackHomeworkId" placeholder="输入作业ID">
+    <textarea id="feedbackContent" placeholder="请输入你的反馈内容..."></textarea>
+    <button onclick="submitFeedback()">提交反馈</button>
+    <p id="feedbackTip"></p>
+  </div>
+
+  <script>
+    // 后端接口地址
+    const baseUrl = "http://localhost:3000"
+
+    // 1. 上传作业
+    async function uploadHomework() {
+      const fileInput = document.getElementById("image")
+      const tip = document.getElementById("uploadTip")
+      if (!fileInput.files.length) {
+        tip.innerText = "请先选择要上传的图片！"
+        tip.style.color = "red"
+        return
+      }
+      const file = fileInput.files[0]
+      const formData = new FormData()
+      formData.append("image", file)
+      try {
+        const res = await fetch(`${baseUrl}/upload`, {
+          method: "POST",
+          body: formData
+        })
+        const data = await res.json()
+        if (data.code === 200) {
+          tip.innerText = data.msg + " 作业ID：" + data.data.id
+          tip.style.color = "green"
+          fileInput.value = "" // 清空文件选择
+          loadMyHomework() // 上传成功后刷新作业列表
+        } else {
+          tip.innerText = data.msg
+          tip.style.color = "red"
+        }
+      } catch (err) {
+        tip.innerText = "上传失败：" + err.message
+        tip.style.color = "red"
+      }
+    }
+
+    // 2. 加载我的作业
+    async function loadMyHomework() {
+      const list = document.getElementById("homeworkList")
+      list.innerHTML = "加载中..."
+      try {
+        const res = await fetch(`${baseUrl}/my-homework`)
+        const data = await res.json()
+        if (data.length === 0) {
+          list.innerHTML = "暂无提交的作业！"
+          return
+        }
+        let html = ""
+        data.forEach(hw => {
+          html += `
+          <div style="margin: 15px 0; padding: 10px; border: 1px solid #ddd;">
+            <p>作业ID：${hw.id}</p>
+            <img src="${baseUrl}${hw.image_path}" alt="作业图片">
+            <p>提交时间：${hw.submit_time}</p>
+            <p>AI评分：${hw.ai_score} 分</p>
+            <p>教师评分：${hw.teacher_score || "暂未评分"} 分</p>
+            <p>状态：${hw.status === "ai_scored" ? "AI已评分" : "教师已复核"}</p>
+          </div>
+          `
+        })
+        list.innerHTML = html
+      } catch (err) {
+        list.innerHTML = "加载失败：" + err.message
+      }
+    }
+
+    // 3. 提交反馈
+    async function submitFeedback() {
+      const hwId = document.getElementById("feedbackHomeworkId").value
+      const content = document.getElementById("feedbackContent").value
+      const tip = document.getElementById("feedbackTip")
+      if (!hwId || !content) {
+        tip.innerText = "请输入作业ID和反馈内容！"
+        tip.style.color = "red"
+        return
+      }
+      try {
+        const res = await fetch(`${baseUrl}/feedback`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            homework_id: hwId,
+            content: content
+          })
+        })
+        const data = await res.json()
+        if (data.code === 200) {
+          tip.innerText = data.msg
+          tip.style.color = "green"
+          document.getElementById("feedbackHomeworkId").value = ""
+          document.getElementById("feedbackContent").value = ""
+        } else {
+          tip.innerText = data.msg
+          tip.style.color = "red"
+        }
+      } catch (err) {
+        tip.innerText = "提交失败：" + err.message
+        tip.style.color = "red"
+      }
+    }
+
+    // 页面加载时自动加载作业列表
+    window.onload = loadMyHomework
+  </script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>教师端 - 作业批改系统</title>
+  <style>
+    body { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+    .section { margin: 30px 0; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+    button { padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #218838; }
+    .homework-item { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; }
+    img { max-width: 300px; margin: 10px 0; }
+    input[type="number"] { width: 80px; padding: 6px; margin: 0 10px; }
+  </style>
+</head>
+<body>
+  <h1>教师端 - 作业批改</h1>
+
+  <div class="section">
+    <h2>所有学生作业</h2>
+    <button onclick="loadAllHomework()">刷新作业列表</button>
+    <div id="allHomeworkList"></div>
+  </div>
+
+  <script>
+    const baseUrl = "http://localhost:3000"
+
+    // 加载所有作业
+    async function loadAllHomework() {
+      const list = document.getElementById("allHomeworkList")
+      list.innerHTML = "加载中..."
+      try {
+        const res = await fetch(`${baseUrl}/homeworks`)
+        const data = await res.json()
+        if (data.length === 0) {
+          list.innerHTML = "暂无学生提交的作业！"
+          return
+        }
+        let html = ""
+        data.forEach(hw => {
+          html += `
+          <div class="homework-item">
+            <p>作业ID：${hw.id} | 学生ID：${hw.student_id} | 提交时间：${hw.submit_time}</p>
+            <img src="${baseUrl}${hw.image_path}" alt="作业图片">
+            <p>AI评分：${hw.ai_score} 分</p>
+            <p>当前教师评分：${hw.teacher_score || "暂未评分"}</p>
+            <div>
+              <input type="number" id="score_${hw.id}" placeholder="输入评分" min="0" max="100">
+              <button onclick="updateScore(${hw.id})">提交评分</button>
+              <span id="scoreTip_${hw.id}"></span>
+            </div>
+          </div>
+          `
+        })
+        list.innerHTML = html
+      } catch (err) {
+        list.innerHTML = "加载失败：" + err.message
+      }
+    }
+
+    // 修改评分
+    async function updateScore(hwId) {
+      const scoreInput = document.getElementById(`score_${hwId}`)
+      const tip = document.getElementById(`scoreTip_${hwId}`)
+      const score = scoreInput.value
+      if (!score || score < 0 || score > 100) {
+        tip.innerText = "请输入0-100之间的评分！"
+        tip.style.color = "red"
+        return
+      }
+      try {
+        const res = await fetch(`${baseUrl}/score`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            id: hwId,
+            score: score
+          })
+        })
+        const data = await res.json()
+        if (data.code === 200) {
+          tip.innerText = "评分修改成功！"
+          tip.style.color = "green"
+          scoreInput.value = ""
+          setTimeout(() => loadAllHomework(), 500) // 500ms后刷新列表
+        } else {
+          tip.innerText = data.msg
+          tip.style.color = "red"
+        }
+      } catch (err) {
+        tip.innerText = "修改失败：" + err.message
+        tip.style.color = "red"
+      }
+    }
+
+    // 页面加载时自动加载作业列表
+    window.onload = loadAllHomework
+  </script>
+</body>
+</html>
