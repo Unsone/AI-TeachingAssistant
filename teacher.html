@@ -2,59 +2,285 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>教师端 - 作业批改系统</title>
+  <title>教师端 - 人工智能助教系统</title>
   <style>
-    body { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
-    .section { margin: 30px 0; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
-    button { padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #218838; }
-    .homework-item { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; }
-    img { max-width: 300px; margin: 10px 0; }
-    input[type="number"] { width: 80px; padding: 6px; margin: 0 10px; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f8f9fa;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      padding: 30px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 30px;
+      font-weight: 300;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #e9ecef;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 12px 24px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      font-size: 16px;
+      color: #6c757d;
+      transition: all 0.3s;
+    }
+    .tab.active {
+      color: #007bff;
+      border-bottom-color: #007bff;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #495057;
+    }
+    textarea, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 120px;
+      resize: vertical;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .student-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .student-card {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .student-card:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transform: translateY(-2px);
+    }
+    .homework-detail {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      border: 1px solid #e9ecef;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      margin: 10px 0;
+    }
+    .feedback-item {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 6px;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    .score-section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #e9ecef;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
-  <h1>教师端 - 作业批改</h1>
+  <h1>教师端 - 人工智能助教系统</h1>
 
-  <div class="section">
-    <h2>所有学生作业</h2>
-    <button onclick="loadAllHomework()">刷新作业列表</button>
-    <div id="allHomeworkList"></div>
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('settings')">设置答案与提示词</button>
+      <button class="tab" onclick="showTab('students')">学生列表</button>
+    </div>
+
+    <div id="settings" class="tab-content active">
+      <h2>设置参考答案与AI提示词</h2>
+      <form id="answerForm">
+        <div class="form-group">
+          <label for="reference_answer">参考答案（可选）：</label>
+          <textarea id="reference_answer" placeholder="输入参考答案，帮助AI更准确判卷"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="prompt">AI提示词：</label>
+          <textarea id="prompt" placeholder="输入提示词，指导AI如何判卷"></textarea>
+        </div>
+        <button type="submit">保存设置</button>
+        <span id="settingsTip"></span>
+      </form>
+    </div>
+
+    <div id="students" class="tab-content">
+      <h2>学生列表</h2>
+      <button onclick="loadStudents()">刷新学生列表</button>
+      <div id="studentList" class="student-list"></div>
+      <div id="homeworkDetail" class="homework-detail" style="display: none;"></div>
+    </div>
   </div>
 
   <script>
     const baseUrl = "http://localhost:3000"
+    let currentStudentId = null
 
-    // 加载所有作业
-    async function loadAllHomework() {
-      const list = document.getElementById("allHomeworkList")
-      list.innerHTML = "加载中..."
+    function showTab(tabName) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'))
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'))
+      document.querySelector(`button[onclick="showTab('${tabName}')"]`).classList.add('active')
+      document.getElementById(tabName).classList.add('active')
+      if (tabName === 'students') {
+        loadStudents()
+      }
+    }
+
+    // 加载设置
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${baseUrl}/get-answer`)
+        const data = await res.json()
+        document.getElementById('reference_answer').value = data.reference_answer || ''
+        document.getElementById('prompt').value = data.prompt || ''
+      } catch (err) {
+        console.error('加载设置失败：', err)
+      }
+    }
+
+    // 保存设置
+    document.getElementById('answerForm').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const tip = document.getElementById('settingsTip')
+      const reference_answer = document.getElementById('reference_answer').value
+      const prompt = document.getElementById('prompt').value
+      try {
+        const res = await fetch(`${baseUrl}/set-answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference_answer, prompt })
+        })
+        const data = await res.json()
+        if (data.code === 200) {
+          tip.innerText = '设置保存成功！'
+          tip.style.color = 'green'
+        } else {
+          tip.innerText = data.msg
+          tip.style.color = 'red'
+        }
+      } catch (err) {
+        tip.innerText = '保存失败：' + err.message
+        tip.style.color = 'red'
+      }
+    })
+
+    // 加载学生列表
+    async function loadStudents() {
+      const list = document.getElementById('studentList')
+      list.innerHTML = '加载中...'
       try {
         const res = await fetch(`${baseUrl}/homeworks`)
         const data = await res.json()
-        if (data.length === 0) {
-          list.innerHTML = "暂无学生提交的作业！"
-          return
-        }
-        let html = ""
+        const students = {}
         data.forEach(hw => {
+          if (!students[hw.student_id]) {
+            students[hw.student_id] = { name: hw.student_name, homeworks: [] }
+          }
+          students[hw.student_id].homeworks.push(hw)
+        })
+        let html = ''
+        for (const [id, student] of Object.entries(students)) {
           html += `
-          <div class="homework-item">
-            <p>作业ID：${hw.id} | 学生ID：${hw.student_id} | 提交时间：${hw.submit_time}</p>
-            <img src="${baseUrl}${hw.image_path}" alt="作业图片">
-            <p>AI评分：${hw.ai_score} 分</p>
-            <p>当前教师评分：${hw.teacher_score || "暂未评分"}</p>
-            <div>
-              <input type="number" id="score_${hw.id}" placeholder="输入评分" min="0" max="100">
-              <button onclick="updateScore(${hw.id})">提交评分</button>
-              <span id="scoreTip_${hw.id}"></span>
+            <div class="student-card" onclick="showStudentDetail(${id})">
+              <h3>${student.name}</h3>
+              <p>作业数量：${student.homeworks.length}</p>
             </div>
-          </div>
+          `
+        }
+        list.innerHTML = html || '暂无学生提交作业'
+      } catch (err) {
+        list.innerHTML = '加载失败：' + err.message
+      }
+    }
+
+    // 显示学生详情
+    async function showStudentDetail(studentId) {
+      currentStudentId = studentId
+      const detail = document.getElementById('homeworkDetail')
+      detail.style.display = 'block'
+      detail.innerHTML = '加载中...'
+      try {
+        const res = await fetch(`${baseUrl}/homeworks`)
+        const data = await res.json()
+        const studentHomeworks = data.filter(hw => hw.student_id == studentId)
+        let html = `<h3>学生详情</h3>`
+        studentHomeworks.forEach(hw => {
+          html += `
+            <div class="homework-item" style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px;">
+              <p><strong>作业ID：</strong>${hw.id} | <strong>提交时间：</strong>${hw.submit_time}</p>
+              ${hw.image_path ? `<img src="${baseUrl}${hw.image_path}" alt="作业图片">` : ''}
+              ${hw.text_content ? `<p><strong>文本内容：</strong>${hw.text_content}</p>` : ''}
+              <div class="score-section">
+                <p><strong>AI评分：</strong>${hw.ai_score} 分</p>
+                <p><strong>教师评分：</strong>${hw.teacher_score || '暂未评分'} 分</p>
+                <div>
+                  <input type="number" id="score_${hw.id}" placeholder="输入评分" min="0" max="100" style="width: 100px; margin-right: 10px;">
+                  <button onclick="updateScore(${hw.id})">提交评分</button>
+                  <span id="scoreTip_${hw.id}"></span>
+                </div>
+              </div>
+              <div>
+                <strong>反馈：</strong>
+                ${hw.feedbacks.length ? hw.feedbacks.map(fb => `<div class="feedback-item">${fb.time}: ${fb.content}</div>`).join('') : '暂无反馈'}
+              </div>
+            </div>
           `
         })
-        list.innerHTML = html
+        detail.innerHTML = html
       } catch (err) {
-        list.innerHTML = "加载失败：" + err.message
+        detail.innerHTML = '加载失败：' + err.message
       }
     }
 
@@ -64,39 +290,36 @@
       const tip = document.getElementById(`scoreTip_${hwId}`)
       const score = scoreInput.value
       if (!score || score < 0 || score > 100) {
-        tip.innerText = "请输入0-100之间的评分！"
-        tip.style.color = "red"
+        tip.innerText = '请输入0-100之间的评分！'
+        tip.style.color = 'red'
         return
       }
       try {
         const res = await fetch(`${baseUrl}/score`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            id: hwId,
-            score: score
-          })
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: hwId, score: score })
         })
         const data = await res.json()
         if (data.code === 200) {
-          tip.innerText = "评分修改成功！"
-          tip.style.color = "green"
-          scoreInput.value = ""
-          setTimeout(() => loadAllHomework(), 500) // 500ms后刷新列表
+          tip.innerText = '评分修改成功！'
+          tip.style.color = 'green'
+          scoreInput.value = ''
+          if (currentStudentId) showStudentDetail(currentStudentId)
         } else {
           tip.innerText = data.msg
-          tip.style.color = "red"
+          tip.style.color = 'red'
         }
       } catch (err) {
-        tip.innerText = "修改失败：" + err.message
-        tip.style.color = "red"
+        tip.innerText = '修改失败：' + err.message
+        tip.style.color = 'red'
       }
     }
 
-    // 页面加载时自动加载作业列表
-    window.onload = loadAllHomework
+    // 页面加载时加载设置
+    window.onload = loadSettings
   </script>
+</body>
+</html>
 </body>
 </html>
